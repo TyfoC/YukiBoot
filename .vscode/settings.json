@@ -1,0 +1,7 @@
+{
+	"files.associations": {
+		"*.bnf": "bnf",
+		"tty.h": "c",
+		"_drive.h": "c"
+	}
+}
