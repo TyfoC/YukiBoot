@@ -6,6 +6,7 @@
 __call_rm_service:
 	pop dword [.tmp]
 	call RM_SRVLDR_ADDRESS
+	add esp, 4
 	push dword [.tmp]
 	ret
 .tmp:	dd 0

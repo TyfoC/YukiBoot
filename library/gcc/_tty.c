@@ -130,7 +130,6 @@ void tty_puts(const char* str) {
 
 	flags:
 		`+` - print sign for decimal number (dec)
-		` ` - print a space before the result if the decimal number is positive (dec)
 		`#` - alternative form for printing the value (hex, oct)
 */
 void tty_printf(const char* format, ...) {
@@ -138,15 +137,14 @@ void tty_printf(const char* format, ...) {
 	va_start(list, format);
 
 	char* ptr = (char*)&format[0];
-	uint8_t printSign, printSpaceBefResult, altForm;
+	uint8_t printSign, altForm;
 	
 	while (*ptr) {
 		if (*ptr == '%') {
-			printSign = printSpaceBefResult = altForm = 0;
+			printSign = altForm = 0;
 
 			while (1) {
 				if (*(++ptr) == '+') printSign = 1;
-				else if (*ptr == ' ') printSpaceBefResult = 1;
 				else if (*ptr == '#') altForm = 1;
 				else break;
 			}
@@ -154,19 +152,37 @@ void tty_printf(const char* format, ...) {
 			if (*ptr == '%') tty_putc('%');
 			else if (*ptr == 'c') tty_putc((char)va_arg(list, int));
 			else if (*ptr == 's') tty_puts(va_arg(list, char*));
-			else if (*ptr == 'd') tty_puts(itoa(va_arg(list, int32_t), conv_buffer_, 10));
+			else if (*ptr == 'd') {
+				int32_t tmp = va_arg(list, int32_t);
+				if (printSign && tmp >= 0) tty_putc('+');
+				tty_puts(itoa(tmp, conv_buffer_, 10));
+			}
 			else if (*ptr == 'u') tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 10));
 			else if (*ptr == 'b') tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 2));
-			else if (*ptr == 'o') tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 8));
-			else if (*ptr == 'x') tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 16));
+			else if (*ptr == 'o') {
+				if (altForm) tty_putc('0');
+				tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 8));
+			}
+			else if (*ptr == 'x') {
+				if (altForm) tty_puts("0x");
+				tty_puts(utoa(va_arg(list, uint32_t), conv_buffer_, 16));
+			}
 			else if (*ptr == 'f') {
 				tty_puts(dtoa(va_arg(list, double), conv_buffer_, 10));
 			}
 			else if (*ptr == 'l') {
-				if (*(++ptr) == 'd') tty_puts(ltoa(va_arg(list, long), conv_buffer_, 10));
+				if (*(++ptr) == 'd') {
+					long tmp = va_arg(list, long);
+					if (printSign && tmp >= 0) tty_putc('+');
+					tty_puts(ltoa(tmp, conv_buffer_, 10));
+				}
 				else if (*ptr == 'u') tty_puts(ultoa(va_arg(list, unsigned long), conv_buffer_, 10));
 				else if (*ptr == 'l') {
-					if (*(++ptr) == 'd') tty_puts(lltoa(va_arg(list, long long), conv_buffer_, 10));
+					if (*(++ptr) == 'd')  {
+						long long tmp = va_arg(list, long long);
+						if (printSign && tmp >= 0) tty_putc('+');
+						tty_puts(lltoa(tmp, conv_buffer_, 10));
+					}
 					else if (*ptr == 'u') tty_puts(ulltoa(va_arg(list, unsigned long long), conv_buffer_, 10));
 				}
 			}

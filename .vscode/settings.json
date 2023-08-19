@@ -2,6 +2,8 @@
 	"files.associations": {
 		"*.bnf": "bnf",
 		"tty.h": "c",
-		"_drive.h": "c"
+		"_drive.h": "c",
+		"_fpu.h": "c",
+		"_vesa.h": "c"
 	}
 }

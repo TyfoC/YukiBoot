@@ -189,6 +189,12 @@ lldiv_t lldiv(long long x, long long y) {
 
 char* itoa(int value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
+
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
 	
 	int isNeg = value < 0;
 	char* buffPtr = (char*)&buffer[isNeg];
@@ -213,6 +219,12 @@ char* itoa(int value, char* buffer, int radix) {
 
 char* ltoa(long value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
+
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
 	
 	int isNeg = value < 0;
 	char* buffPtr = (char*)&buffer[0];
@@ -239,6 +251,12 @@ char* ltoa(long value, char* buffer, int radix) {
 
 char* lltoa(long long value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
+
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
 	
 	int isNeg = value < 0;
 	char* buffPtr = (char*)&buffer[0];
@@ -266,6 +284,12 @@ char* lltoa(long long value, char* buffer, int radix) {
 char* utoa(unsigned int value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
 
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
+
 	long unsigned int valLen = 1;
 	unsigned int valCopy = value;
 	while (valCopy /= radix) ++valLen;
@@ -284,6 +308,12 @@ char* utoa(unsigned int value, char* buffer, int radix) {
 char* ultoa(unsigned long value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
 
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
+
 	long unsigned int valLen = 1;
 	unsigned long valCopy = value;
 	while (valCopy /= radix) ++valLen;
@@ -301,6 +331,12 @@ char* ultoa(unsigned long value, char* buffer, int radix) {
 
 char* ulltoa(unsigned long long value, char* buffer, int radix) {
 	if (radix < 2 || radix > 36) return NULL;
+
+	if (!value) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return buffer;
+	}
 
 	long unsigned int valLen = 1;
 	unsigned long long valCopy = value;

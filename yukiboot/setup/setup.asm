@@ -134,7 +134,8 @@ MainSetup:
 	%include "cpu.asm"
 	%include "disk.asm"
 
-GDT:	ALIGN(4)
+ALIGN(4)
+GDT:
 .Register:
 	dw .After - .Begin - 1
 	dd .Begin

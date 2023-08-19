@@ -48,10 +48,10 @@ Begin:
 
 ;	Service #0 - read drive parameters
 ;	Input:
-;		DL - drive index
+;		dl - drive index
 ;	Output:
-;		AL - status
-;		EBX - buffer address
+;		al - status
+;		ebx - tmp buffer address
 ;		Buffer:
 ;			0x00:		SPT (sectors per track) - byte, but written as word
 ;			0x02:		HPC (heads per cylinder) - word
@@ -59,7 +59,6 @@ Begin:
 ;			0x06:		NoHDD (number of hard disk drives) - byte, but written as word
 ServiceReadDriveParameters:
 	pusha
-	push es
 	mov ah, 0x08
 	mov edi, 0
 	mov es, di
@@ -84,27 +83,129 @@ ServiceReadDriveParameters:
 	mov byte [Buffer + 7], 0
 	
 	jmp .Done
-
 .Error:
-	pop es
 	popa
 	mov al, 0
 	ret
 .Done:
-	pop es
 	popa
 	mov al, 1
 	mov ebx, Buffer
 	ret
 
+;	Service #1 - read sector
+;	Input:
+;		cx - sector number[0-5] & cylinder index[8-15][6-7]
+;		dh - head index
+;		dl - drive index
+;	Output:
+;		al - status
+;		ebx - tmp buffer address
+ServiceReadSector:
+	pusha
+	mov ax, 0x0201
+	mov bx, 0
+	mov es, bx
+	mov bx, Buffer
+	int 0x13
+	jc .Error
+
+	test ah, ah
+	jnz .Error
+.Done:
+	popa
+	mov al, 1
+	mov ebx, Buffer
+	ret
+.Error:
+	popa
+	mov al, 0
+	ret
+
+;	Service #3 - get vesa info
+;	Output:
+;		al - status
+;		ebx - tmp buffer address
+ServiceGetVESAInfo:
+	pusha
+	mov ax, 0x4F00
+	mov di, Buffer
+	int 0x10
+	jc .Error
+
+	cmp ax, 0x4F
+	jne .Error
+.Done:
+	popa
+	mov al, 1
+	mov ebx, Buffer
+	ret
+.Error:
+	popa
+	mov al, 0
+	ret
+
+;	Service #4 - get vesa mode info
+;	Input:
+;		cx - mode index
+;	Output:
+;		al - status
+;		ebx - tmp buffer address
+ServiceGetVESAModeInfo:
+	pusha
+	mov ax, 0x4F01
+	mov di, Buffer
+	int 0x10
+	jc .Error
+
+	cmp ax, 0x4F
+	jne .Error
+.Done:
+	popa
+	mov al, 1
+	mov ebx, Buffer
+	ret
+.Error:
+	popa
+	mov al, 0
+	ret
+
+;	Service #5 - set vesa mode
+;	Input:
+;		cx - mode index
+;	Output:
+;		al - status
+ServiceSetVESAMode:
+	pusha
+	mov ax, 0x4F02
+	mov bx, cx
+	int 0x10
+	jc .Error
+
+	cmp ax, 0x4F
+	jne .Error
+.Done:
+	popa
+	mov al, 1
+	ret
+.Error:
+	popa
+	mov al, 0
+	ret
+
 Services:
 	dw ServiceReadDriveParameters
+	dw ServiceReadSector
+	dw 0								; reserved
+	dw ServiceGetVESAInfo
+	dw ServiceGetVESAModeInfo
+	dw ServiceSetVESAMode
 ServicesEnd:
 	
 	%include "cpu.asm"
 
-Buffer:									; for one sector, VESA information and VESA video mode
 	ALIGN(4)
+Buffer:									; for one sector, VESA information and VESA video mode
 	times 512 db 0
 
 	times 1024 - $ + $$ db 0
