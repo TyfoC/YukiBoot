@@ -9,6 +9,7 @@
 		"_sib.h": "c",
 		"_tty.h": "c",
 		"stdarg.h": "c",
-		"string.h": "c"
+		"string.h": "c",
+		"fpu.h": "c"
 	}
 }

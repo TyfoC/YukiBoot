@@ -4,8 +4,9 @@
 #include <sib.h>
 #include <panic.h>
 
-#include <drive.h>
 #include <fpu.h>
+#include <cpuid-support.h>
+#include <drive.h>
 #include <vesa.h>
 #include <mem.h>
 
@@ -20,6 +21,27 @@ char SectorBuffer[DRIVE_SECTOR_SIZE] __attribute__((__aligned__(8)));
 
 extern void bootldr_main(unsigned char driveIndex) {
 	tty_init(0xB8000, TTY_COLOR_LIGHT_GRAY, 80, 25, 160);
+
+	/*	==================
+		FPU
+	====================*/
+
+	SystemInfoBlock.FPU = (size_t)fpu_init();
+	if (SystemInfoBlock.FPU) puts("Warning: failed to init FPU!\r\n");
+
+	/*	==================
+		EBDA segment
+	====================*/
+
+	SystemInfoBlock.EBDASegment = *(uint16_t*)0x40E;
+	DBG_PRINTF("EBDA segment: 0x%x\r\n", SystemInfoBlock.EBDASegment);
+
+	/*	==================
+		CPUID
+	====================*/
+
+	SystemInfoBlock.CPUID = cpuid_is_present();
+	DBG_PRINTF("CPUID: %u\r\n", SystemInfoBlock.CPUID);
 
 	/*	==================
 		Drive
@@ -42,18 +64,14 @@ extern void bootldr_main(unsigned char driveIndex) {
 	}
 
 	/*	==================
-		FPU
+		Memory map
 	====================*/
 
-	SystemInfoBlock.FPU = (size_t)fpu_init();
-	if (SystemInfoBlock.FPU) puts("Warning: failed to init FPU!\r\n");
+	SystemInfoBlock.MemoryMapPtr = (AddressRangeDescriptor_t*)((size_t)&__PTR_END_ADDR__);
+	SystemInfoBlock.NumberOfMemoryRegions = mem_get_map(SystemInfoBlock.MemoryMapPtr);
 
-	/*	==================
-		EBDA segment
-	====================*/
-
-	SystemInfoBlock.EBDASegment = *(uint16_t*)0x40E;
-	DBG_PRINTF("EBDA segment: 0x%x\r\n", SystemInfoBlock.EBDASegment);
+	DBG_PRINTF("Memory map address: %#x\r\n", SystemInfoBlock.MemoryMapPtr);
+	DBG_PRINTF("Number of memory regions: %u\r\n", SystemInfoBlock.NumberOfMemoryRegions);
 
 	/*	==================
 		VESA
@@ -97,16 +115,6 @@ extern void bootldr_main(unsigned char driveIndex) {
 
 		DBG_PRINTF("\tTotal memory (in 64KB blocks): %#x\r\n", SystemInfoBlock.VESAInfo.TotalMemorySize);
 	}
-
-	/*	==================
-		Memory map
-	====================*/
-
-	SystemInfoBlock.MemoryMapPtr = (AddressRangeDescriptor_t*)((size_t)&__PTR_END_ADDR__);
-	SystemInfoBlock.NumberOfMemoryRegions = mem_get_map(SystemInfoBlock.MemoryMapPtr);
-
-	DBG_PRINTF("Memory map address: %#x\r\n", SystemInfoBlock.MemoryMapPtr);
-	DBG_PRINTF("Number of memory regions: %u\r\n", SystemInfoBlock.NumberOfMemoryRegions);
 
 	/*	==================
 		MBR
