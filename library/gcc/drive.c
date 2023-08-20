@@ -21,7 +21,7 @@ uint8_t drive_select(uint8_t driveIndex) {
 	last_cylinder_index_ = ((uint16_t*)tmpValue)[2];
 	number_of_hdds_ = (uint8_t)((uint16_t*)tmpValue)[3];
 
-	max_lba_ = (last_cylinder_index_ * heads_per_cylinder_ * (heads_per_cylinder_ - 1)) * sectors_per_track_ + (sectors_per_track_ - 1);
+	max_lba_ = drive_chs_to_lba(last_cylinder_index_, heads_per_cylinder_ - 1, sectors_per_track_);
 	
 	// tmpValue - interface support bitmask
 	CALL_RM_SERVICE(
@@ -62,6 +62,10 @@ void drive_lba_to_chs(uint32_t lba, uint16_t* cylinder, uint8_t* head, uint8_t* 
 	*cylinder = lba / (heads_per_cylinder_ * sectors_per_track_);
 	*head = (lba / sectors_per_track_) % heads_per_cylinder_;
 	*sector = (lba % sectors_per_track_) + 1;
+}
+
+uint32_t drive_chs_to_lba(uint16_t cylinder, uint8_t head, uint8_t sector) {
+	return (cylinder * heads_per_cylinder_ * head) * sectors_per_track_ + (sector - 1);
 }
 
 //	Returns the number of sectors read

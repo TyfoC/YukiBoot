@@ -1,5 +1,10 @@
 #include "stdlib.h"
 
+extern inline void* malloc(long unsigned int size);
+extern inline void* calloc(long unsigned int count, long unsigned int size);
+extern inline void* realloc(void* oldMem, long unsigned int newSize);
+extern inline void free(void* oldMem);
+
 static long unsigned int rand_next_ = 0;
 static const char conv_digits_[36] = {
 	'0', '1', '2', '3', '4', '5', '6', '7', '8',

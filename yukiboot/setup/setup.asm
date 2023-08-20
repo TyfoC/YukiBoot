@@ -71,8 +71,19 @@ Messages:
 .FailedToReadDrive:		db "Failed to read drive!", 0
 .FailedToInitDrive:		db "Failed to init drive!", 0
 
-PartitionTable:
 	times 446 - $ + $$ db 0
+PartitionTable:
+.FirstEntry:														; yukiboot
+	db 0x80															; bootable/active
+	db 0xFF, 0xFF, 0xFF												; Start CHS (deprecated)
+	db 0x7F															; AltOS
+	db 0xFF, 0xFF, 0xFF												; Start CHS (deprecated)
+	dd 0															; Start address
+	dd 1 + MAIN_SETUP_LENGTH + RM_SRVLDR_LENGTH + BOOTLDR_LENGTH	; Number of sectors
+	
+.SecondEntry:	dq 0xFF, 0xFF										; Invalid entry
+.ThirdEntry:	dq 0xFF, 0xFF										; Invalid entry
+.FourthEntry:	dq 0xFF, 0xFF										; Invalid entry
 
 	times 510 - $ + $$ db 0
 	dw 0xAA55

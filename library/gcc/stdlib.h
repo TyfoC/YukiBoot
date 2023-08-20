@@ -3,6 +3,7 @@
 #define _STDLIB_H					// stdlib.h additional functions
 
 #include <stddef.h>
+#include "pmm.h"
 #include "ctype.h"
 #include "string.h"
 #include "fpu.h"
@@ -41,12 +42,23 @@ unsigned long strtoul(const char* src, char** endptr);
 int rand(void);
 void srand(int seed);
 
-// [NO_IMPL] Memory allocation and deallocation functions (only prototypes, must be implemented in the kernel)
+// [NO_IMPL] Memory allocation and deallocation functions (implemented in the kernel)
 
-void* malloc(long unsigned int size);
-void* calloc(long unsigned int count, long unsigned int elemSize);
-void* realloc(void* oldMemory, long unsigned int newSize);
-void free(void* oldMemory);
+inline void* malloc(long unsigned int size) {
+	return pmm_malloc((size_t)size);
+}
+
+inline void* calloc(long unsigned int count, long unsigned int elemSize) {
+	return pmm_malloc((size_t)(count * elemSize));
+}
+
+inline void* realloc(void* oldMem, long unsigned int newSize) {
+	return pmm_realloc(oldMem, (size_t)newSize);
+}
+
+inline void free(void* oldMem) {
+	(void)pmm_free(oldMem);
+}
 
 //	Math functions
 
