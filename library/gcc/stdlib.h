@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include "ctype.h"
 #include "string.h"
-#include "_fpu.h"
+#include "fpu.h"
 
 #define RAND_MAX						32767
 

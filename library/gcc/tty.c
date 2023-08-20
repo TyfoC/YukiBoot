@@ -1,4 +1,6 @@
-#include "_tty.h"
+#include "tty.h"
+
+extern inline void tty_printf(const char* fmt, ...);
 
 static uint32_t video_buffer_address_ = 0xB8000;
 static uint8_t text_color_ = TTY_COLOR_LIGHT_GRAY;
@@ -74,7 +76,7 @@ uint16_t tty_get_line(void) {
 }
 
 uint16_t tty_get_column(void) {
-	return cursor_offset_ % bytes_per_scan_line_;
+	return (cursor_offset_ % bytes_per_scan_line_) >> 1;
 }
 
 void tty_fix_cursor_position(void) {
@@ -83,7 +85,7 @@ void tty_fix_cursor_position(void) {
 		return;
 	}
 
-	if (tty_get_line() >= number_of_lines_ || tty_get_column() >= number_of_columns_) {
+	if (tty_get_line() >= number_of_lines_) {
 		const size_t lineWidth = number_of_columns_ << 1;
 		void* dstBuff = (void*)video_buffer_address_;
 		void* srcBuff = (void*)(video_buffer_address_ + bytes_per_scan_line_);
@@ -132,10 +134,7 @@ void tty_puts(const char* str) {
 		`+` - print sign for decimal number (dec)
 		`#` - alternative form for printing the value (hex, oct)
 */
-void tty_printf(const char* format, ...) {
-	va_list list;
-	va_start(list, format);
-
+void tty_vprintf(const char* format, va_list list) {
 	char* ptr = (char*)&format[0];
 	uint8_t printSign, altForm;
 	

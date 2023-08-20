@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __FPU_H
-#define __FPU_H
+#ifndef FPU_H
+#define FPU_H
 
 #include <stdint.h>
 

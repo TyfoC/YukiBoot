@@ -1,4 +1,4 @@
-#include "_vesa.h"
+#include "vesa.h"
 
 static VESAInfo_t info_ __attribute__((__aligned__(4)));
 static VESAModeInfo_t mode_info_ __attribute__((__aligned__(4)));

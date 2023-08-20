@@ -93,7 +93,34 @@ ServiceReadDriveParameters:
 	mov ebx, Buffer
 	ret
 
-;	Service #1 - read sector
+;	Service #1 - check extension present
+;	Input:
+;		dl - drive index
+;	Output:
+;		al - status
+;		cx - interface support bitmask
+ServiceCheckExtensionPresent:
+	pusha
+	mov ah, 0x41
+	mov bx, 0x55AA
+	int 0x13
+	jc .Error
+
+	cmp bx, 0xAA55
+	jne .Error
+
+	mov [Buffer], cx
+.Done:
+	popa
+	mov al, 1
+	mov cx, [Buffer]
+	ret
+.Error:
+	popa
+	mov al, 0
+	ret
+
+;	Service #2 - read sector
 ;	Input:
 ;		cx - sector number[0-5] & cylinder index[8-15][6-7]
 ;		dh - head index
@@ -122,7 +149,44 @@ ServiceReadSector:
 	mov al, 0
 	ret
 
-;	Service #3 - get vesa info
+;	Service #3 - read sector ext
+;	Input:
+;		dl - drive index
+;		ebx:eax - LBA (eax - low part, ebx - high part)
+;	Output:
+;		al - status
+;		ebx - tmp buffer address
+ServiceReadSectorExt:
+	pusha
+	sub sp, 0x10					; reserve space for DAP (disk address packet)
+	mov bp, sp
+	
+	mov word [bp + 14], 0x0010		; DAP.Size && DAP.Reserved [LE]
+	mov word [bp + 12], 1			; DAP.NumberOfSectors
+	mov word [bp + 10], Buffer		; DAP.Offset
+	mov word [bp + 8], 0			; DAP.Segment
+	mov dword [bp + 4], eax			; DAP.LBA[LOW]
+	mov dword [bp], ebx				; DAP.LBA[HIGH]
+	mov ah, 0x42
+	mov si, bp
+	int 0x13
+	jc .Error
+
+	test ah, ah
+	jnz .Error
+.Done:
+	add sp, 0x10
+	popa
+	mov al, 1
+	mov ebx, Buffer
+	ret
+.Error:
+	add sp, 0x10
+	popa
+	mov al, 0
+	ret
+
+;	Service #4 - get vesa info
 ;	Output:
 ;		al - status
 ;		ebx - tmp buffer address
@@ -145,7 +209,7 @@ ServiceGetVESAInfo:
 	mov al, 0
 	ret
 
-;	Service #4 - get vesa mode info
+;	Service #5 - get vesa mode info
 ;	Input:
 ;		cx - mode index
 ;	Output:
@@ -170,7 +234,7 @@ ServiceGetVESAModeInfo:
 	mov al, 0
 	ret
 
-;	Service #5 - set vesa mode
+;	Service #6 - set vesa mode
 ;	Input:
 ;		cx - mode index
 ;	Output:
@@ -193,13 +257,53 @@ ServiceSetVESAMode:
 	mov al, 0
 	ret
 
+;	Service #7 - get map entry
+;	Input:
+;		ebx - entry offset
+;	Output:
+;		al - status
+;		ecx - next entry offset or zero
+;		ebx - tmp buffer offset
+ServiceGetMapEntry:
+	pushad
+	mov eax, 0xE820
+	mov ecx, 0x0018
+	mov edx, 0x534D4150
+	mov edi, Buffer + 4
+	int 0x15
+	jc .Error
+
+	cmp eax, 0x534D4150
+	jne .Error
+
+	mov [Buffer], ebx
+
+	cmp cl, 0x0018
+	jae .Done
+
+	mov dword [Buffer + 24], 1					; set first bit in extended attributes (for compatibility)
+.Done:
+	popad
+	mov al, 1
+	mov ebx, Buffer + 4
+	mov ecx, [Buffer]
+	ret
+.Error:
+	popad
+	mov al, 0
+	ret
+
 Services:
 	dw ServiceReadDriveParameters
+	dw ServiceCheckExtensionPresent
 	dw ServiceReadSector
-	dw 0								; reserved
+	dw ServiceReadSectorExt
+
 	dw ServiceGetVESAInfo
 	dw ServiceGetVESAModeInfo
 	dw ServiceSetVESAMode
+
+	dw ServiceGetMapEntry
 ServicesEnd:
 	
 	%include "cpu.asm"
@@ -208,5 +312,11 @@ ServicesEnd:
 Buffer:									; for one sector, VESA information and VESA video mode
 	times 512 db 0
 
-	times 1024 - $ + $$ db 0
+DiskAccessPacket:
+	.SizeOfPacket:		db 0x10
+	.Reserved:			db 0
+	.NumberOfSectors:	dw 1
+	.Address:			dq 0
+
+	times 1536 - $ + $$ db 0
 End:

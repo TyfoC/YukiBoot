@@ -1,10 +1,10 @@
 #pragma once
-#ifndef __TTY_H
-#define __TTY_H
+#ifndef TTY_H
+#define TTY_H
 
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdarg.h>
+#include "stdlib.h"
 #include "string.h"
 
 #define TTY_COLOR_BLACK				0x00
@@ -47,6 +47,12 @@ void tty_fix_cursor_position(void);
 
 void tty_putc(char value);
 void tty_puts(const char* str);
-void tty_printf(const char* format, ...);
+
+void tty_vprintf(const char* fmt, va_list list);
+inline void tty_printf(const char* fmt, ...) {
+	va_list arguments;
+	va_start(arguments, fmt);
+	tty_vprintf(fmt, arguments);
+}
 
 #endif
