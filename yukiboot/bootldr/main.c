@@ -486,11 +486,11 @@ extern void bootldr_main(unsigned char driveIndex) {
 		) CALL_RM_SERVICE(RM_SERVICE_SET_BIOS_VIDEO_MODE, ::"c"(0x03));
 		else panic("Error: unknown VGA text mode!");
 
-		SystemInfoBlock.VideoBufferAddress = 0xA0000;
-		SystemInfoBlock.VideoModeWidth = 320;
-		SystemInfoBlock.VideoModeHeight = 200;
+		SystemInfoBlock.VideoBufferAddress = 0xB8000;
+		SystemInfoBlock.VideoModeWidth = 80;
+		SystemInfoBlock.VideoModeHeight = 25;
 		SystemInfoBlock.VideoModeBitsPerPixel = 8;
-		SystemInfoBlock.VideoModeBytesPerScanLine = 320;
+		SystemInfoBlock.VideoModeBytesPerScanLine = 160;
 	}
 	else if (!strcmp(cfgVideoModeTypeStr, "VGA_GRAPHICS")) {
 		if (
@@ -498,11 +498,11 @@ extern void bootldr_main(unsigned char driveIndex) {
 		) CALL_RM_SERVICE(RM_SERVICE_SET_BIOS_VIDEO_MODE, ::"c"(0x13));
 		else panic("Error: unknown VGA graphics mode!");
 
-		SystemInfoBlock.VideoBufferAddress = 0xB8000;
-		SystemInfoBlock.VideoModeWidth = 80;
-		SystemInfoBlock.VideoModeHeight = 25;
+		SystemInfoBlock.VideoBufferAddress = 0xA0000;
+		SystemInfoBlock.VideoModeWidth = 320;
+		SystemInfoBlock.VideoModeHeight = 200;
 		SystemInfoBlock.VideoModeBitsPerPixel = 8;
-		SystemInfoBlock.VideoModeBytesPerScanLine = 160;
+		SystemInfoBlock.VideoModeBytesPerScanLine = 320;
 	}
 	else panic("Error: unknown video mode!");
 

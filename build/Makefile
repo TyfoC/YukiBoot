@@ -25,8 +25,11 @@ build-image:
 		./rbfs-file-table.bin \
 	> $(OUTPUT)
 
+	outputSize=`stat -L -c %s $(IMAGE_YUKIBOOT)`;\
+	outputLength=`expr $$((outputSize)) / 512`;\
 	yukibootSize=`stat -L -c %s $(IMAGE_YUKIBOOT)`;\
 	yukibootLength=`expr $$((yukibootSize)) / 512`;\
+	rbfsLength=`expr $$((outputLength)) - $$((yukibootLength))`;\
 	$(UTILITY_RBFS) -wmbrpe $(OUTPUT) 1 7F 80 $$((yukibootLength)) 1
 
 build-needed:
