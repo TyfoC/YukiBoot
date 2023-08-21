@@ -20,7 +20,11 @@ build-image:
 	$(MAKE) clear
 	$(UTILITY_RBFS) -cstgpt ../storage 1 "Boot Partition" 0 ./rbfs-partition-header.bin ./rbfs-file-table.bin
 	$(UTILITY_RBFS) -cfsh 1 1 ./rbfs-header.bin
-	cat $(IMAGE_YUKIBOOT) ./rbfs-header.bin ./rbfs-partition-header.bin ./rbfs-file-table.bin > $(OUTPUT)
+
+	cat $(IMAGE_YUKIBOOT) ./rbfs-header.bin \
+		./rbfs-partition-header.bin \
+		./rbfs-file-table.bin \
+	> $(OUTPUT)
 
 	yukibootSize=`stat -L -c %s $(IMAGE_YUKIBOOT)`;\
 	yukibootLength=`expr $$((yukibootSize)) / 512`;\
@@ -45,4 +49,4 @@ debug:
 	$(EMULATOR) -monitor stdio -m 256M -cpu max -drive format=raw,file=$(OUTPUT) -D debug.txt -d cpu_reset
 
 clear:
-	rm -f debug.txt ./rbfs-header.bin ./rbfs-partition-header.bin ./rbfs-file-table.bin
+	rm -f ./rbfs-header.bin ./rbfs-partition-header.bin ./rbfs-file-table.bin ./output.bin debug.txt ./*.ini

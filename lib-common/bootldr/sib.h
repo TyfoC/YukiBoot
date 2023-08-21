@@ -23,7 +23,7 @@ typedef struct /*__attribute__((__packed__))*/ {
 
 	VESAInfo_t					VESAInfo;						// VESA info
 
-	BootUnit_t*					BootUnits;
+	RBFSBootUnit_t*				RBFSBootUnits;
 	size_t						NumberOfBootUnits;
 } SystemInfoBlock_t;
 

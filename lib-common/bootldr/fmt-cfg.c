@@ -114,7 +114,7 @@ void fmt_cfg_conv_str_to_units(const char* str, ConfigFormatUnit_t** units, size
 	}
 }
 
-void fmt_cfg_free_uniits(ConfigFormatUnit_t* units, size_t count) {
+void fmt_cfg_free_units(ConfigFormatUnit_t* units, size_t count) {
 	for (size_t i = 0; i < count; i++) {
 		if (units[i].Name) free(units[i].Name);
 		if (units[i].Value) free(units[i].Value);

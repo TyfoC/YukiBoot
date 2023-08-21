@@ -1,7 +1,7 @@
 #include "boot-unit.h"
 
 //	You must select drive!
-BootUnit_t BuildBootUnit(const MBRPartitionEntry_t* partitionTableEntry) {
+BootUnit_t build_boot_unit(const MBRPartitionEntry_t* partitionTableEntry) {
 	BootUnit_t bootUnit;
 
 	bootUnit.DriveIndex = drive_get_index();
@@ -34,4 +34,10 @@ BootUnit_t BuildBootUnit(const MBRPartitionEntry_t* partitionTableEntry) {
 	}
 
 	return bootUnit;
+}
+
+void free_rbfs_boot_units(RBFSBootUnit_t* units, size_t count) {
+	for (size_t i = 0; i < count; i++) {
+		if (units[i].PartitionName) free(units[i].PartitionName);
+	}
 }

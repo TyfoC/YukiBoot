@@ -37,6 +37,8 @@ size_t rbfs_get_file_header(size_t partitionHeaderAddress, rbfs_hash_t filePathH
 	if (!fileHeader) fileHeader = &tmp_file_header_;
 
 	size_t fileHdrAddr = (size_t)((int64_t)partitionHeaderAddress + tmp_partition_header_.DataOffset);
+
+
 	for (size_t i = 0; i < (size_t)tmp_partition_header_.NumberOfFileHeaders; i++) {
 		if (drive_read_sectors_ext((uint64_t)fileHdrAddr, 1, fileHeader) != 1) return (long unsigned int)-1;
 

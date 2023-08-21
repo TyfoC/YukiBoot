@@ -7,6 +7,7 @@
 #include <pmm.h>
 #include <rbfs.h>
 #include <fmt-cfg.h>
+#include <inl-asm.h>
 
 #include <fpu.h>
 #include <cpuid-support.h>
@@ -23,16 +24,13 @@ extern char* __PTR_END_ADDR__;
 SystemInfoBlock_t SystemInfoBlock __attribute__((__aligned__(8)));
 MasterBootRecord_t MasterBootRecord __attribute__((__aligned__(8)));
 
-rbfs_hash_t SystemPartitionNameHash;
-rbfs_hash_t BootConfigPartitionPathHash;
-size_t SystemPartitionHeaderAddress;
+size_t PartitionHeaderAddr;
 size_t BootConfigFileHeaderAddress;
-RBFSPartitionHeader_t SystemPartitionHeader __attribute__((__aligned__(8)));
+RBFSPartitionHeader_t PartitionHeader __attribute__((__aligned__(8)));
 RBFSFileHeader_t BootConfigFileHeader __attribute__((__aligned__(8)));
+const rbfs_hash_t BootConfigFilePathHash = 0x0025C03B092E8636;			// rbfs_hash_str("boot.cfg")
 
 BootUnit_t* build_boot_unit_table(BootUnit_t* table, size_t* length) {
-	SystemPartitionNameHash = rbfs_hash_str("Boot Partition");
-	BootConfigPartitionPathHash = rbfs_hash_str("boot.cfg");
 
 	BootUnit_t bootUnit;
 	for (size_t i = 0; i < MBR_MAX_NUMBER_OF_PARTITIONS; i++) {
@@ -42,7 +40,7 @@ BootUnit_t* build_boot_unit_table(BootUnit_t* table, size_t* length) {
 			MasterBootRecord.PartitionTable[i].Status != MBR_PARTITION_STATUS_BOOTABLE
 		) continue;
 
-		bootUnit = BuildBootUnit(&MasterBootRecord.PartitionTable[i]);
+		bootUnit = build_boot_unit(&MasterBootRecord.PartitionTable[i]);
 
 		table = (BootUnit_t*)realloc(table, (*length + 1) * sizeof(BootUnit_t));
 		if (!table) panic("Error: failed to allocate memory!\r\n");
@@ -71,7 +69,7 @@ extern void bootldr_main(unsigned char driveIndex) {
 	====================*/
 
 	SystemInfoBlock.EBDASegment = (size_t)*(uint16_t*)0x40E;
-	DBG_PRINTF("EBDA segment: 0x%x\r\n", SystemInfoBlock.EBDASegment);
+	DBG_PRINTF("EBDA segment: %#x\r\n", SystemInfoBlock.EBDASegment);
 
 	/*	==================
 		CPUID
@@ -85,8 +83,8 @@ extern void bootldr_main(unsigned char driveIndex) {
 	====================*/
 
 	SystemInfoBlock.DriveIndex = (size_t)driveIndex;
-	DBG_PRINTF("BIOS drive index: 0x%x\r\n", SystemInfoBlock.DriveIndex);
-	if (!drive_select(SystemInfoBlock.DriveIndex)) panic("Error: failed to select drive (0x%x)!\r\n", SystemInfoBlock.DriveIndex);
+	DBG_PRINTF("BIOS drive index: %#x\r\n", SystemInfoBlock.DriveIndex);
+	if (!drive_select(SystemInfoBlock.DriveIndex)) panic("Error: failed to select drive (%#x)!\r\n", SystemInfoBlock.DriveIndex);
 
 	SystemInfoBlock.NumberOfHDDs = (size_t)drive_get_number_of_hdds();
 	DBG_PRINTF("Number of hard disk drives: %u\r\n", SystemInfoBlock.NumberOfHDDs);
@@ -185,64 +183,206 @@ extern void bootldr_main(unsigned char driveIndex) {
 
 	if (drive_read_sectors_ext(0, 1, (void*)&MasterBootRecord) != 1) panic("Error: failed to read MBR!\r\n");
 
+	size_t numOfBootUnits = 0;
+	BootUnit_t* bootUnits = build_boot_unit_table(NULL, &numOfBootUnits);
+
+	size_t tmpStrLen, i, j;
+	RBFSHeader_t* rbfsHdr;
 	SystemInfoBlock.NumberOfBootUnits = 0;
-	SystemInfoBlock.BootUnits = build_boot_unit_table(SystemInfoBlock.BootUnits, &SystemInfoBlock.NumberOfBootUnits);
+	SystemInfoBlock.RBFSBootUnits = NULL;
 
-	char* bCfgData;
-	size_t numOfCfgUnits = 0;
-	ConfigFormatUnit_t* cfgUnits = 0;
-	DBG_PUTS("Boot units:\r\n");
-	for (size_t i = 0; i < SystemInfoBlock.NumberOfBootUnits; i++) {
-		DBG_PRINTF(
-			"%u) Drive: %#x, Type: %#x, Address: %#x, Length: %#x\r\n",
-			i,
-			SystemInfoBlock.BootUnits[i].DriveIndex,
-			SystemInfoBlock.BootUnits[i].Type,
-			SystemInfoBlock.BootUnits[i].Address,
-			SystemInfoBlock.BootUnits[i].NumberOfSectors
-		);
+	for (i = 0; i < numOfBootUnits; i++) {
+		if (bootUnits[i].Type != MBR_PARTITION_TYPE_ALT_OS) continue;
 
-		if (!SystemInfoBlock.BootUnits[i].NumberOfSectors) continue;
-		if (!rbfs_init(SystemInfoBlock.BootUnits[i].Address)) continue;
-
-		SystemPartitionHeaderAddress = rbfs_find_partition_header(SystemPartitionNameHash, &SystemPartitionHeader);
-		if (SystemPartitionHeaderAddress == (size_t)-1) {
-			DBG_PUTS("Warnign: failed to find partition `Boot Partition`!\r\n");
+		if (drive_get_index() != bootUnits[i].DriveIndex && !drive_select(bootUnits[i].DriveIndex)) {
+			DBG_PRINTF("Warning: failed to select drive (%#x)!\r\n", bootUnits[i].DriveIndex);
 			continue;
 		}
 
-		BootConfigFileHeaderAddress = rbfs_get_file_header(
-			SystemPartitionHeaderAddress,
-			BootConfigPartitionPathHash,
-			&BootConfigFileHeader
-		);
+		//	Check for the existence of an `RBFSHeader_t` structure
+		if (!rbfs_init(bootUnits[i].Address)) continue;
 
-		if (SystemPartitionHeaderAddress == (size_t)-1) {
-			DBG_PUTS("Warnign: failed to find config file!\r\n");
-			continue;
+		rbfsHdr = rbfs_get_header();
+
+		for (j = 0; j < (size_t)rbfsHdr->NumberOfPartitions; j++) {
+			PartitionHeaderAddr = rbfs_get_partition_header(j, &PartitionHeader);
+			if (PartitionHeaderAddr == ((size_t)-1)) {
+				DBG_PUTS("Warning: failed to read partition header!\r\n");
+				DBG_PRINTF(
+					"\tBIOS drive index: %#x, partition header index: %u\r\n",
+					bootUnits[i].DriveIndex, j
+				);
+
+				continue;
+			}
+
+			BootConfigFileHeaderAddress = rbfs_get_file_header(
+				PartitionHeaderAddr,
+				BootConfigFilePathHash,
+				&BootConfigFileHeader
+			);
+
+			if (BootConfigFileHeaderAddress == ((size_t)-1)) continue;
+
+			SystemInfoBlock.RBFSBootUnits = (RBFSBootUnit_t*)realloc(
+				SystemInfoBlock.RBFSBootUnits,
+				sizeof(RBFSBootUnit_t) * (SystemInfoBlock.NumberOfBootUnits + 1)
+			);
+
+			if (!SystemInfoBlock.RBFSBootUnits) panic("Error: failed to allocate memory!\r\n");
+
+			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].DriveIndex = bootUnits[i].DriveIndex;
+			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].BootConfigFileHeaderAddress = BootConfigFileHeaderAddress;
+
+			tmpStrLen = strlen(&PartitionHeader.Name[0]);
+			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName = (char*)malloc(tmpStrLen + 1);
+			if (
+				!SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName
+			) panic("Error: failed to allocate memory!\r\n");
+
+			memcpy(
+				&SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName[0],
+				&PartitionHeader.Name[0],
+				tmpStrLen + 1
+			);
+
+			SystemInfoBlock.NumberOfBootUnits += 1;
 		}
-
-		bCfgData = (char*)malloc(BootConfigFileHeader.SizeInBytes);
-		if (!bCfgData) {
-			DBG_PUTS("Warning: failed to allocate memory for config!\r\n");
-			continue;
-		}
-
-		if (rbfs_read_file(BootConfigFileHeaderAddress, bCfgData) != BootConfigFileHeader.SizeInBytes) {
-			DBG_PUTS("Warnign: failed to read config file!\r\n");
-			continue;
-		}
-
-		fmt_cfg_conv_str_to_units(bCfgData, &cfgUnits, &numOfCfgUnits);
-		DBG_PUTS("Config:\r\n");
-
-		for (size_t j = 0; j < numOfCfgUnits; j++) {
-			DBG_PRINTF("%s = `%s`\r\n", cfgUnits[j].Name, cfgUnits[j].Value);
-		}
-
-		free(cfgUnits);
-		free(bCfgData);
 	}
 
+	tty_set_text_color((TTY_COLOR_LIGHT_BLUE << 4) | TTY_COLOR_WHITE);
+	tty_clear_screen();
+	tty_set_line(0);
+	tty_set_column(0);
+
+	size_t numOfLines = tty_get_number_of_lines();
+	size_t numOfColumns = tty_get_number_of_columns();
+	size_t lastColIndex = numOfColumns - 1;
+
+	// line #0
+	putchar(0xC9);
+	for (i = 0; i < numOfColumns - 2; i++) putchar(0xCD);
+	putchar(0xBB);
+
+	// line #1
+	putchar(0xBA);
+	tty_set_column((numOfColumns - 42) >> 1);
+	puts("yukiboot bootloader by Noimage PNG (1.0.0)");
+	tty_set_column(lastColIndex);
+	putchar(0xBA);
+
+	// line #2
+	putchar(0xC7);
+	for (i = 0; i < numOfColumns - 2; i++) putchar(0xC4);
+	putchar(0xB6);
+
+	// line #3 - line #(numOfLines - 4)
+	for (i = 3; i < numOfLines - 3; i++) {
+		tty_set_column(0);
+		putchar(0xBA);
+		tty_set_column(lastColIndex);
+		putchar(0xBA);
+	}
+
+	// line #(numOfLines - 3)
+	putchar(0xBA);
+	for (i = 0; i < numOfColumns - 2; i++) putchar(0xCD);
+	putchar(0xBA);
+
+	uint8_t pressedKey = 0;
+	uint8_t curColor = tty_get_text_color();
+	size_t curLineIndex = 3, curColIndex;
+	size_t firstUnitIndex = 0, selUnitOffset = 0, selUnitIndex = 0;
+
+	// fix partition names
+	for (i = 0; i < SystemInfoBlock.NumberOfBootUnits; i++) {
+		tmpStrLen = strlen(SystemInfoBlock.RBFSBootUnits[i].PartitionName);
+		if (tmpStrLen >= numOfColumns - 7) {
+			SystemInfoBlock.RBFSBootUnits[i].PartitionName[numOfColumns - 7] = '\0';
+			SystemInfoBlock.RBFSBootUnits[i].PartitionName[numOfColumns - 8] = '.';
+			SystemInfoBlock.RBFSBootUnits[i].PartitionName[numOfColumns - 9] = '.';
+			SystemInfoBlock.RBFSBootUnits[i].PartitionName[numOfColumns - 10] = '.';
+		}
+	}
+
+	if (SystemInfoBlock.NumberOfBootUnits) {
+		while (true) {
+			tty_set_line(3);
+			tty_set_column(1);
+			tty_set_text_color(curColor);
+
+			for (
+				i = firstUnitIndex, j = curLineIndex;
+				i < SystemInfoBlock.NumberOfBootUnits && j < numOfLines - 3;
+				i++, j++
+			) {
+				printf("%u) %s", i + 1, SystemInfoBlock.RBFSBootUnits[i].PartitionName);
+				
+				curColIndex = tty_get_column();
+				while (curColIndex <= lastColIndex - 1) {
+					putchar(' ');
+					++curColIndex;
+				}
+
+				putchar(0xBA);
+				putchar(0xBA);
+			}
+
+			tty_set_line(3 + selUnitOffset);
+			tty_set_column(1);
+			tty_set_text_color((TTY_COLOR_WHITE << 4) | TTY_COLOR_LIGHT_CYAN);
+			printf("%u) %s\r\n", selUnitIndex + 1, SystemInfoBlock.RBFSBootUnits[selUnitIndex].PartitionName);
+			tty_set_text_color(curColor);
+
+			while (true) {
+				if (inb(0x64) & 1) {
+					pressedKey = inb(0x60);
+					if (pressedKey == 0xE0) while (inb(0x64) & 1) pressedKey = inb(0x60);
+					break;
+				}
+			}
+
+			// cursor up/keypad 8 or W 
+			if (pressedKey == 0x48 || pressedKey == 0x11) {
+				if (selUnitOffset) --selUnitIndex;
+				else {
+					if (firstUnitIndex) {
+						--firstUnitIndex;
+						--selUnitIndex;
+					}
+				}
+
+				selUnitOffset = selUnitIndex - firstUnitIndex;
+			}
+
+			// cursor down/keypad 2 or S
+			else if (pressedKey == 0x50 || pressedKey == 0x1F) {
+				if (selUnitIndex + 1 < SystemInfoBlock.NumberOfBootUnits) {
+					if (curLineIndex + selUnitOffset < numOfLines - 4) ++selUnitIndex;
+					else {
+						++firstUnitIndex;
+						++selUnitIndex;
+					}
+				}
+				
+				selUnitOffset = selUnitIndex - firstUnitIndex;
+			}
+
+			// space or enter
+			else if (pressedKey == 0x39 || pressedKey == 0x1C) break;
+		}
+	}
+
+	if (SystemInfoBlock.NumberOfBootUnits) {
+		__asm__ __volatile__(
+			"jmp ."
+			::"a"(0x99887766),
+			"b"(selUnitIndex)
+		);
+	}
+
+	if (
+		SystemInfoBlock.RBFSBootUnits
+	) free_rbfs_boot_units(SystemInfoBlock.RBFSBootUnits, SystemInfoBlock.NumberOfBootUnits);
 	__asm__ __volatile__("cli; hlt");
 }

@@ -45,6 +45,8 @@ uint16_t tty_get_column(void);
 
 void tty_fix_cursor_position(void);
 
+void tty_clear_screen(void);
+
 void tty_putc(char value);
 void tty_puts(const char* str);
 

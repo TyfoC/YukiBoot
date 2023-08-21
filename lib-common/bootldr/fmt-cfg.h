@@ -10,6 +10,6 @@ typedef struct __attribute__((__packed__)) {
 } ConfigFormatUnit_t;
 
 void fmt_cfg_conv_str_to_units(const char* str, ConfigFormatUnit_t** units, size_t* count);
-void fmt_cfg_free_uniits(ConfigFormatUnit_t* units, size_t count);
+void fmt_cfg_free_units(ConfigFormatUnit_t* units, size_t count);
 
 #endif

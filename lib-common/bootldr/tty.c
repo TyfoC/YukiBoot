@@ -100,6 +100,21 @@ void tty_fix_cursor_position(void) {
 	}
 }
 
+void tty_clear_screen(void) {
+	uint8_t* dst = (uint8_t*)video_buffer_address_;
+	const size_t lineWidth = number_of_columns_ << 1;
+
+	size_t j;
+	for (size_t i = 0; i < number_of_lines_; i++) {
+		for (j = 0; j < lineWidth;) {
+			dst[j++] = ' ';
+			dst[j++] = text_color_;
+		}
+		
+		dst = (void*)((size_t)dst + bytes_per_scan_line_);
+	}
+}
+
 void tty_putc(char value) {
 	if (!number_of_lines_) return;
 

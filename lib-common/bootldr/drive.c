@@ -69,7 +69,7 @@ void drive_lba_to_chs(uint32_t lba, uint16_t* cylinder, uint8_t* head, uint8_t* 
 }
 
 uint32_t drive_chs_to_lba(uint16_t cylinder, uint8_t head, uint8_t sector) {
-	return (cylinder * heads_per_cylinder_ * head) * sectors_per_track_ + (sector - 1);
+	return (cylinder * heads_per_cylinder_ + head) * sectors_per_track_ + (sector - 1);
 }
 
 //	Returns the number of sectors read
