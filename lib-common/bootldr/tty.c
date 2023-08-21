@@ -60,8 +60,6 @@ uint16_t tty_get_bytes_per_scan_line(void) {
 }
 
 void tty_set_line(uint16_t lineIndex) {
-	if (lineIndex >= number_of_lines_) return;
-
 	cursor_offset_ = lineIndex * bytes_per_scan_line_ + ((cursor_offset_ % bytes_per_scan_line_) >> 1);
 }
 
@@ -85,18 +83,18 @@ void tty_fix_cursor_position(void) {
 		return;
 	}
 
-	if (tty_get_line() >= number_of_lines_) {
+	if (tty_get_line() >= (uint32_t)number_of_lines_) {
 		const size_t lineWidth = number_of_columns_ << 1;
 		void* dstBuff = (void*)video_buffer_address_;
 		void* srcBuff = (void*)(video_buffer_address_ + bytes_per_scan_line_);
 
-		for (size_t i = 0; i < (size_t)(number_of_lines_ - 1); i++) {
+		for (size_t i = 0; i < (size_t)(number_of_lines_ - 1); i++) {;
 			memcpy(dstBuff, srcBuff, lineWidth);
 			dstBuff += bytes_per_scan_line_;
 			srcBuff += bytes_per_scan_line_;
 		}
 		
-		memset(srcBuff, 0, lineWidth);
+		memset(dstBuff, 0, lineWidth);
 		tty_set_line(number_of_lines_ - 1);
 		tty_set_column(0);
 	}
@@ -105,18 +103,16 @@ void tty_fix_cursor_position(void) {
 void tty_putc(char value) {
 	if (!number_of_lines_) return;
 
+	tty_fix_cursor_position();
+
 	if (value == '\r') tty_set_column(0);
-	else if (value == '\n') {
-		if (tty_get_line() >= number_of_lines_) tty_fix_cursor_position();
-		else tty_set_line(tty_get_line() + 1);
-	}
+	else if (value == '\n') tty_set_line(tty_get_line() + 1);
 	else if (value == '\t') for (size_t i = 0; i < TTY_TAB_LENGTH; i++) tty_putc(' ');
 	else if (value == '\n') for (size_t i = 0; i < TTY_TAB_LENGTH; i++) tty_putc('\n');
 	else if (value == '\b') {
 		if (cursor_offset_ >= 2) cursor_offset_ -= 2;
 	}
 	else {
-		tty_fix_cursor_position();
 		((char*)video_buffer_address_)[cursor_offset_++] = value;
 		((char*)video_buffer_address_)[cursor_offset_++] = text_color_;
 	}

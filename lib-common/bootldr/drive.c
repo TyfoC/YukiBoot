@@ -34,6 +34,10 @@ uint8_t drive_select(uint8_t driveIndex) {
 	return 1;
 }
 
+uint8_t drive_get_index(void) {
+	return drive_index_;
+}
+
 uint16_t drive_get_spt(void) {
 	return sectors_per_track_;
 }
@@ -146,6 +150,7 @@ size_t drive_read_sectors_ext(uint64_t lba, size_t count, void* buffer) {
 		}
 
 		buffer = (void*)((size_t)buffer + DRIVE_SECTOR_SIZE);
+		++lba;
 	}
 
 	if (count && !(interface_support_bitmask_ & DRIVE_IF_SUPPORT_DAP)) return resultCnt;

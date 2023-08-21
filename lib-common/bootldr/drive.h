@@ -19,6 +19,7 @@
 #define DRIVE_IF_SUPPORT_EDD					0x04
 
 uint8_t drive_select(uint8_t driveIndex);
+uint8_t drive_get_index(void);
 uint16_t drive_get_spt(void);					// sectors per track
 uint16_t drive_get_hpc(void);					// heads per cylinder
 uint16_t drive_get_last_cylinder_index(void);

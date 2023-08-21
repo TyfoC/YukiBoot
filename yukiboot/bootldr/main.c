@@ -5,6 +5,8 @@
 #include <sib.h>
 #include <panic.h>
 #include <pmm.h>
+#include <rbfs.h>
+#include <fmt-cfg.h>
 
 #include <fpu.h>
 #include <cpuid-support.h>
@@ -20,49 +22,27 @@ extern char* __PTR_END_ADDR__;
 
 SystemInfoBlock_t SystemInfoBlock __attribute__((__aligned__(8)));
 MasterBootRecord_t MasterBootRecord __attribute__((__aligned__(8)));
-ExtendedBootRecord_t ExtendedBootRecord __attribute__((__aligned__(8)));
 
-BootUnit_t* build_boot_unit_table(uint8_t driveIndex, BootUnit_t* table, size_t* length, size_t* ebrIndex) {
+rbfs_hash_t SystemPartitionNameHash;
+rbfs_hash_t BootConfigPartitionPathHash;
+size_t SystemPartitionHeaderAddress;
+size_t BootConfigFileHeaderAddress;
+RBFSPartitionHeader_t SystemPartitionHeader __attribute__((__aligned__(8)));
+RBFSFileHeader_t BootConfigFileHeader __attribute__((__aligned__(8)));
+
+BootUnit_t* build_boot_unit_table(BootUnit_t* table, size_t* length) {
+	SystemPartitionNameHash = rbfs_hash_str("Boot Partition");
+	BootConfigPartitionPathHash = rbfs_hash_str("boot.cfg");
+
 	BootUnit_t bootUnit;
-	MasterBootRecord_t* buffer = *ebrIndex ? &ExtendedBootRecord : &MasterBootRecord;
 	for (size_t i = 0; i < MBR_MAX_NUMBER_OF_PARTITIONS; i++) {
 		// `invalid` entry
 		if (
-			buffer->PartitionTable[i].Status != 0 &&
-			buffer->PartitionTable[i].Status != MBR_PARTITION_STATUS_BOOTABLE
+			MasterBootRecord.PartitionTable[i].Status != 0 &&
+			MasterBootRecord.PartitionTable[i].Status != MBR_PARTITION_STATUS_BOOTABLE
 		) continue;
 
-		bootUnit.DriveIndex = driveIndex;
-		bootUnit.Type = buffer->PartitionTable[i].Type;
-
-		if (
-			buffer->PartitionTable[i].StartHead < 0xFE &&
-			buffer->PartitionTable[i].StartSectorCylinder != 0xFFFF &&
-			!buffer->PartitionTable[i].StartAddress
-		) {
-			bootUnit.Address = drive_chs_to_lba(
-				EXTRACT_CYL_FROM_CYL_SECT(buffer->PartitionTable[i].StartSectorCylinder),
-				buffer->PartitionTable[i].StartHead,
-				EXTRACT_SECT_FROM_CYL_SECT(buffer->PartitionTable[i].StartSectorCylinder)
-			);
-		}
-		else bootUnit.Address = buffer->PartitionTable[i].StartAddress;
-
-		if (
-			buffer->PartitionTable[i].NumberOfSectors
-		) bootUnit.NumberOfSectors = buffer->PartitionTable[i].NumberOfSectors;
-		else {
-			bootUnit.NumberOfSectors = (
-				drive_chs_to_lba(
-					EXTRACT_CYL_FROM_CYL_SECT(buffer->PartitionTable[i].LastSectorCylinder),
-					buffer->PartitionTable[i].LastHead,
-					EXTRACT_SECT_FROM_CYL_SECT(buffer->PartitionTable[i].LastSectorCylinder)
-				) + 1 - bootUnit.Address
-			);
-		}
-
-		bootUnit.MBRPartitionEntryIndex = i;
-		bootUnit.EBRIndex = *ebrIndex;
+		bootUnit = BuildBootUnit(&MasterBootRecord.PartitionTable[i]);
 
 		table = (BootUnit_t*)realloc(table, (*length + 1) * sizeof(BootUnit_t));
 		if (!table) panic("Error: failed to allocate memory!\r\n");
@@ -70,9 +50,7 @@ BootUnit_t* build_boot_unit_table(uint8_t driveIndex, BootUnit_t* table, size_t*
 		memcpy(&table[*length], &bootUnit, sizeof(BootUnit_t));
 		++(*length);
 
-		if (bootUnit.Type == MBR_PARTITION_TYPE_NEAR_EBR || bootUnit.Type == MBR_PARTITION_TYPE_FAR_EBR) {
-			table = build_boot_unit_table(driveIndex, table, length, ebrIndex);
-		}
+		// if (!(bootUnit.Type == MBR_PARTITION_TYPE_NEAR_EBR || bootUnit.Type == MBR_PARTITION_TYPE_FAR_EBR)) continue;
 	}
 
 	return table;
@@ -208,15 +186,14 @@ extern void bootldr_main(unsigned char driveIndex) {
 	if (drive_read_sectors_ext(0, 1, (void*)&MasterBootRecord) != 1) panic("Error: failed to read MBR!\r\n");
 
 	SystemInfoBlock.NumberOfBootUnits = 0;
-	size_t tmpEbrIndex = 0;
-	SystemInfoBlock.BootUnits = build_boot_unit_table(
-		SystemInfoBlock.DriveIndex, SystemInfoBlock.BootUnits,
-		&SystemInfoBlock.NumberOfBootUnits, &tmpEbrIndex
-	);
+	SystemInfoBlock.BootUnits = build_boot_unit_table(SystemInfoBlock.BootUnits, &SystemInfoBlock.NumberOfBootUnits);
 
-	puts("Boot units:\r\n");
+	char* bCfgData;
+	size_t numOfCfgUnits = 0;
+	ConfigFormatUnit_t* cfgUnits = 0;
+	DBG_PUTS("Boot units:\r\n");
 	for (size_t i = 0; i < SystemInfoBlock.NumberOfBootUnits; i++) {
-		printf(
+		DBG_PRINTF(
 			"%u) Drive: %#x, Type: %#x, Address: %#x, Length: %#x\r\n",
 			i,
 			SystemInfoBlock.BootUnits[i].DriveIndex,
@@ -224,6 +201,47 @@ extern void bootldr_main(unsigned char driveIndex) {
 			SystemInfoBlock.BootUnits[i].Address,
 			SystemInfoBlock.BootUnits[i].NumberOfSectors
 		);
+
+		if (!SystemInfoBlock.BootUnits[i].NumberOfSectors) continue;
+		if (!rbfs_init(SystemInfoBlock.BootUnits[i].Address)) continue;
+
+		SystemPartitionHeaderAddress = rbfs_find_partition_header(SystemPartitionNameHash, &SystemPartitionHeader);
+		if (SystemPartitionHeaderAddress == (size_t)-1) {
+			DBG_PUTS("Warnign: failed to find partition `Boot Partition`!\r\n");
+			continue;
+		}
+
+		BootConfigFileHeaderAddress = rbfs_get_file_header(
+			SystemPartitionHeaderAddress,
+			BootConfigPartitionPathHash,
+			&BootConfigFileHeader
+		);
+
+		if (SystemPartitionHeaderAddress == (size_t)-1) {
+			DBG_PUTS("Warnign: failed to find config file!\r\n");
+			continue;
+		}
+
+		bCfgData = (char*)malloc(BootConfigFileHeader.SizeInBytes);
+		if (!bCfgData) {
+			DBG_PUTS("Warning: failed to allocate memory for config!\r\n");
+			continue;
+		}
+
+		if (rbfs_read_file(BootConfigFileHeaderAddress, bCfgData) != BootConfigFileHeader.SizeInBytes) {
+			DBG_PUTS("Warnign: failed to read config file!\r\n");
+			continue;
+		}
+
+		fmt_cfg_conv_str_to_units(bCfgData, &cfgUnits, &numOfCfgUnits);
+		DBG_PUTS("Config:\r\n");
+
+		for (size_t j = 0; j < numOfCfgUnits; j++) {
+			DBG_PRINTF("%s = `%s`\r\n", cfgUnits[j].Name, cfgUnits[j].Value);
+		}
+
+		free(cfgUnits);
+		free(bCfgData);
 	}
 
 	__asm__ __volatile__("cli; hlt");

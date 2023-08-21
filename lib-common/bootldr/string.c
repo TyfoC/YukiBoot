@@ -4,13 +4,7 @@ void* memcpy(void* dst, const void* src, size_t size) {
 	unsigned char* dst8 = (unsigned char*)dst;
 	unsigned char* src8 = (unsigned char*)src;
 
-	while (size) {
-		*dst8 = *src8;
-
-		++dst8;
-		++src8;
-		--size;
-	}
+	for (size_t i = 0; i < size; i++) dst8[i] = src8[i];
 
 	return (void*)dst8;
 }

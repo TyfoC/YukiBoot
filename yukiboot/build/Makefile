@@ -5,8 +5,10 @@ EMULATOR=qemu-system-i386
 OUTPUT_NAME=yukiboot
 OUTPUT=$(OUTPUT_NAME).bin
 
-DIR_LIB_NASM=../../library/nasm
-DIR_LIB_GCC=../../library/gcc
+DIR_LIB_NASM=../../lib-nasm
+DIR_LIB_COMMON=../../lib-common
+DIR_LIB_BOOTLDR=$(DIR_LIB_COMMON)/bootldr
+DIR_LIB_RBFS=$(DIR_LIB_COMMON)/rbfs
 DIR_SETUP=../setup
 DIR_RM_SRVLDR=../rm-srvldr
 DIR_BOOTLDR=../bootldr
@@ -15,13 +17,13 @@ DIR_OUTPUT=./bin
 COMPILE_FLAGS=-ffreestanding -Wall -Wextra -O0 -nostdlib -std=c17
 LINK_FLAGS=-ffreestanding -Wall -Wextra -O0 -nostdlib -lgcc
 
-BOOTLDR_COMPILE_FLAGS=$(COMPILE_FLAGS) -m32 -I $(DIR_LIB_GCC)
-BOOTLDR_LINK_FLAGS=$(LINK_FLAGS) -m32 -T bootldr.ld -masm=intel
+BOOTLDR_COMPILE_FLAGS=$(COMPILE_FLAGS) -m32 -I $(DIR_LIB_BOOTLDR) -I $(DIR_LIB_RBFS)
+BOOTLDR_LINK_FLAGS=$(LINK_FLAGS) -m32 -T bootldr.ld
 
-LIB_GCC_C_SRCS=$(shell find $(DIR_LIB_GCC)/ -name *.c)
-LIB_GCC_ASM_SRCS=$(shell find $(DIR_LIB_GCC)/ -name *.asm)
-LIB_GCC_C_OBJS=$(addsuffix .gcc.o, $(LIB_GCC_C_SRCS))
-LIB_GCC_ASM_OBJS=$(addsuffix .gcc.o, $(LIB_GCC_ASM_SRCS))
+LIB_COMMON_C_SRCS=$(shell find $(DIR_LIB_COMMON)/ -name *.c)
+LIB_COMMON_ASM_SRCS=$(shell find $(DIR_LIB_COMMON)/ -name *.asm)
+LIB_COMMON_C_OBJS=$(addsuffix .gcc.o, $(LIB_COMMON_C_SRCS))
+LIB_COMMON_ASM_OBJS=$(addsuffix .gcc.o, $(LIB_COMMON_ASM_SRCS))
 
 BOOTLDR_C_SRCS=$(shell find $(DIR_BOOTLDR)/ -name *.c)
 BOOTLDR_ASM_SRCS=$(shell find $(DIR_BOOTLDR)/ -name *.asm)
@@ -57,11 +59,11 @@ build-rm-srvldr:
 	$(ASSEMBLER) -fbin $(DIR_RM_SRVLDR)/rm-srvldr.asm -i $(DIR_LIB_NASM)/ -I $(DIR_OUTPUT)/ -o $(DIR_OUTPUT)/rm-srvldr.bin
 
 build-bootldr:
-ifneq ($(LIB_GCC_C_SRCS),)					# build if .c library files exist
-	$(MAKE) $(LIB_GCC_C_OBJS)
+ifneq ($(LIB_COMMON_C_SRCS),)					# build if .c library files exist
+	$(MAKE) $(LIB_COMMON_C_OBJS)
 endif
-ifneq ($(LIB_GCC_ASM_SRCS),)				# build if .asm library files exist
-	$(MAKE) $(LIB_GCC_ASM_OBJS)
+ifneq ($(LIB_COMMON_ASM_SRCS),)				# build if .asm library files exist
+	$(MAKE) $(LIB_COMMON_ASM_OBJS)
 endif
 ifneq ($(BOOTLDR_C_SRCS),)					# build if .c gcc files exist
 	$(MAKE) $(BOOTLDR_C_OBJS)
@@ -69,7 +71,7 @@ endif
 ifneq ($(BOOTLDR_ASM_SRCS),)				# build if .asm gcc files exist
 	$(MAKE) $(BOOTLDR_ASM_OBJS)
 endif
-	$(COMPILER) $(LIB_GCC_C_OBJS) $(LIB_GCC_ASM_OBJS) $(BOOTLDR_C_OBJS) $(BOOTLDR_ASM_OBJS) $(BOOTLDR_LINK_FLAGS) -o $(DIR_OUTPUT)/bootldr.bin
+	$(COMPILER) $(LIB_COMMON_C_OBJS) $(LIB_COMMON_ASM_OBJS) $(BOOTLDR_C_OBJS) $(BOOTLDR_ASM_OBJS) $(BOOTLDR_LINK_FLAGS) -o $(DIR_OUTPUT)/bootldr.bin
 
 clear-setup:
 	rm -f $(DIR_OUTPUT)/setup.bin
@@ -79,17 +81,17 @@ clear-rm-srvldr:
 
 clear-bootldr:
 	rm -f $(DIR_OUTPUT)/bootldr.bin
-	rm -f $(LIB_GCC_C_OBJS) $(LIB_GCC_ASM_OBJS)
+	rm -f $(LIB_COMMON_C_OBJS) $(LIB_COMMON_ASM_OBJS)
 	rm -f $(BOOTLDR_C_OBJS) $(BOOTLDR_ASM_OBJS)
 
 %.c.gcc.o:		%.c
 	$(COMPILER) -c $< $(BOOTLDR_COMPILE_FLAGS) -o $@
 
 %.asm.gcc.o:	%.asm
-	$(ASSEMBLER) -felf $< -i $(DIR_LIB_GCC)/ -o $@
+	$(ASSEMBLER) -felf32 $< -i $(DIR_LIB_COMMON)/ -o $@
 
 %.c.o:			%.c
 	$(COMPILER) -c $< $(BOOTLDR_COMPILE_FLAGS) -o $@
 
 %.asm.o:	%.asm
-	$(ASSEMBLER) -felf $< -i $(DIR_LIB_GCC)/ -o $@
+	$(ASSEMBLER) -felf32 $< -i $(DIR_LIB_COMMON)/ -o $@

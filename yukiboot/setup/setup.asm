@@ -9,9 +9,9 @@
 %define RM_SRVLDR_BASE_SEGMENT				0x0000
 %define RM_SRVLDR_BASE_OFFSET				0x1000
 
-%define BOOTLDR_BASE_ADDRESS				0x00001600
+%define BOOTLDR_BASE_ADDRESS				0x00008000
 %define BOOTLDR_BASE_SEGMENT				0x0000
-%define BOOTLDR_BASE_OFFSET					0x1600
+%define BOOTLDR_BASE_OFFSET					0x8000
 
 %define STACK_TOP_SEGMENT					RM_SRVLDR_BASE_SEGMENT
 %define STACK_TOP_OFFSET					RM_SRVLDR_BASE_OFFSET
@@ -105,7 +105,6 @@ MainSetup:
 	mov ah, 0x0001
 	mov cx, 0x0706
 	int 0x10
-
 	;	Read real mode service loader
 	push es
 	mov cx, RM_SRVLDR_SECTOR

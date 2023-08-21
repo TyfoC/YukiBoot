@@ -2,7 +2,7 @@ ENTRY(bootldr_main)
 OUTPUT_ARCH(i386)
 OUTPUT_FORMAT(binary)
 SECTIONS {
-	__PTR_BASE_ADDR__ = 0x00001600;
+	__PTR_BASE_ADDR__ = 0x00008000;
 	. = __PTR_BASE_ADDR__;
 
 	.header : {
