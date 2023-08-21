@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "rm-srv.h"
+#include "segoff.h"
 
 #define VESA_SIGNATURE										0x41534556
 
@@ -13,23 +14,23 @@
 #define VESA_CAPABILITIES_PROG_RAMDAC_BLANK_BIT				0x04
 
 typedef struct __attribute__((__packed__)) {
-	uint32_t		Signature;				// must be 'VESA' (VESA_SIGNATURE)
-	uint16_t		Version;
-	uint16_t		OEMStringPtr[2];		// far ptr (0 - offset, 1 - segment)
-	uint32_t		Capabilities;
-	uint16_t		VideoModeOffset;
-	uint16_t		VideoModeSegment;
-	uint16_t		TotalMemorySize;		// in 64KB blocks
+	/*0x000*/	uint32_t		Signature;				// must be 'VESA' (VESA_SIGNATURE)
+	/*0x004*/	uint16_t		Version;
+	/*0x006*/	uint16_t		OEMStringPtr[2];		// far ptr (0 - offset, 1 - segment)
+	/*0x00A*/	uint32_t		Capabilities;
+	/*0x00E*/	uint16_t		VideoModeOffset;
+	/*0x010*/	uint16_t		VideoModeSegment;
+	/*0x012*/	uint16_t		TotalMemorySize;		// in 64KB blocks
 
 	//	added in VBE 2.0
 	
-	uint16_t		OEMSoftwareRev;			// BCD
-	uint16_t		OEMVendorNamePtr[2];	// far ptr (0 - offset, 1 - segment)
-	uint16_t		OEMProductNamePtr[2];	// far ptr (0 - offset, 1 - segment)
-	uint16_t		OEMProductRevPtr[2];	// far ptr (0 - offset, 1 - segment)
+	/*0x014*/	uint16_t		OEMSoftwareRev;			// BCD
+	/*0x016*/	uint16_t		OEMVendorNamePtr[2];	// far ptr (0 - offset, 1 - segment)
+	/*0x01A*/	uint16_t		OEMProductNamePtr[2];	// far ptr (0 - offset, 1 - segment)
+	/*0x01E*/	uint16_t		OEMProductRevPtr[2];	// far ptr (0 - offset, 1 - segment)
 
-	uint8_t			Reserved[222];
-	uint8_t			OEMData[256];
+	/*0x022*/	uint8_t			Reserved[222];
+	/*0x100*/	uint8_t			OEMData[256];
 } VESAInfo_t;
 
 typedef struct __attribute__((__packed__)) {

@@ -18,4 +18,6 @@
 
 #define RM_SERVICE_MEM_GET_MAP_ENTRY				0x0007
 
+#define RM_SERVICE_SET_BIOS_VIDEO_MODE				0x0008
+
 #endif

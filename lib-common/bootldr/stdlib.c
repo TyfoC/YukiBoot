@@ -444,3 +444,33 @@ char* ldtoa(long double value, char* buffer, int radix) {
 
 	return buffer;
 }
+
+long uratol(const char* str) {
+	long result = 0;
+
+	char* buffPtr = (char*)&str[0];
+	uint8_t isNeg = buffPtr[0] == '-';
+	if (isNeg || buffPtr[0] == '+') ++buffPtr;
+
+	if (buffPtr[0] != '0' || buffPtr[1] == '\0') return strtol(str, NULL);
+	++buffPtr;
+
+	size_t radix = 10;
+	if (toupper(*buffPtr) == 'X') radix = 16;
+	else if (toupper(*buffPtr) == 'B') radix = 2;
+	else radix = 8;
+	++buffPtr;
+
+	char tmp;
+	while (*buffPtr) {
+		tmp = toupper(*buffPtr);
+		++buffPtr;
+
+		result *= radix;
+		if (isdigit(tmp)) result += tmp - '0';
+		else result += tmp - 'A';
+	}
+
+	if (isNeg) result = 0 - result;
+	return result;
+}

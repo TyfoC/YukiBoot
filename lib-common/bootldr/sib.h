@@ -25,6 +25,12 @@ typedef struct /*__attribute__((__packed__))*/ {
 
 	RBFSBootUnit_t*				RBFSBootUnits;
 	size_t						NumberOfBootUnits;
+
+	size_t						VideoBufferAddress;
+	size_t						VideoModeWidth;
+	size_t						VideoModeHeight;
+	size_t						VideoModeBitsPerPixel;
+	size_t						VideoModeBytesPerScanLine;
 } SystemInfoBlock_t;
 
 #endif

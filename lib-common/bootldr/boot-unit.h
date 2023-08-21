@@ -16,7 +16,8 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct __attribute__((__packed__)) {
 	uint8_t			DriveIndex;						// BIOS drive index
-	uint32_t		BootConfigFileHeaderAddress;	// LBA
+	size_t			PartitionHeaderAddress;			// LBA
+	size_t			CfgFileHeaderAddress;			// LBA
 	char*			PartitionName;
 } RBFSBootUnit_t;
 

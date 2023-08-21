@@ -293,6 +293,16 @@ ServiceGetMapEntry:
 	mov al, 0
 	ret
 
+;	Service #8 - set BIOS video mode
+;	Input:
+;		cl - mode number
+ServiceSetBIOSVideoMode:
+	mov ah, 0
+	mov al, cl
+	int 0x10
+	mov al, 1
+	ret
+
 Services:
 	dw ServiceReadDriveParameters
 	dw ServiceCheckExtensionPresent
@@ -304,6 +314,8 @@ Services:
 	dw ServiceSetVESAMode
 
 	dw ServiceGetMapEntry
+
+	dw ServiceSetBIOSVideoMode
 ServicesEnd:
 	
 	%include "cpu.asm"

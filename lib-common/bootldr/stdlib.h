@@ -81,4 +81,8 @@ char* ftoa(float value, char* buffer, int radix);
 char* dtoa(double value, char* buffer, int radix);
 char* ldtoa(long double value, char* buffer, int radix);
 
+//	[unknown radix] str to <type>
+
+long uratol(const char* str);
+
 #endif

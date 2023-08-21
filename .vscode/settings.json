@@ -62,6 +62,8 @@
 		"stdexcept": "cpp",
 		"streambuf": "cpp",
 		"typeinfo": "cpp",
-		"rbfs-header.h": "c"
+		"rbfs-header.h": "c",
+		"stdlib.h": "c",
+		"vesa.h": "c"
 	}
 }

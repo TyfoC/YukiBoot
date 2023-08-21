@@ -122,3 +122,8 @@ void fmt_cfg_free_units(ConfigFormatUnit_t* units, size_t count) {
 
 	free(units);
 }
+
+char* fmt_cfg_get_value(const ConfigFormatUnit_t* units, size_t count, const char* name) {
+	for (size_t i = 0; i < count; i++) if (!strcmp(units[i].Name, name)) return units[i].Value;
+	return NULL;
+}

@@ -9,6 +9,13 @@ uint8_t vesa_init(void) {
 	if (!rmStatus) return rmStatus;
 
 	memcpy(&info_, (void*)tmpBufferAddress, sizeof(VESAInfo_t));
+
+	if (!info_.VideoModeSegment) {
+		size_t diff = SEGOFF_TO_PHYS(info_.VideoModeSegment, info_.VideoModeOffset) - tmpBufferAddress;
+		info_.VideoModeOffset = ((size_t)&info_ + diff) & 0xFFFF;
+		info_.VideoModeSegment = (((size_t)&info_ + diff) & 0xF0000) >> 4;
+	}
+	
 	return 1;
 }
 

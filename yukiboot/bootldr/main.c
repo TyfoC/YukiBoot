@@ -43,7 +43,7 @@ BootUnit_t* build_boot_unit_table(BootUnit_t* table, size_t* length) {
 		bootUnit = build_boot_unit(&MasterBootRecord.PartitionTable[i]);
 
 		table = (BootUnit_t*)realloc(table, (*length + 1) * sizeof(BootUnit_t));
-		if (!table) panic("Error: failed to allocate memory!\r\n");
+		if (!table) panic("Error: failed to allocate memory!");
 		
 		memcpy(&table[*length], &bootUnit, sizeof(BootUnit_t));
 		++(*length);
@@ -84,7 +84,7 @@ extern void bootldr_main(unsigned char driveIndex) {
 
 	SystemInfoBlock.DriveIndex = (size_t)driveIndex;
 	DBG_PRINTF("BIOS drive index: %#x\r\n", SystemInfoBlock.DriveIndex);
-	if (!drive_select(SystemInfoBlock.DriveIndex)) panic("Error: failed to select drive (%#x)!\r\n", SystemInfoBlock.DriveIndex);
+	if (!drive_select(SystemInfoBlock.DriveIndex)) panic("Error: failed to select drive (%#x)!", SystemInfoBlock.DriveIndex);
 
 	SystemInfoBlock.NumberOfHDDs = (size_t)drive_get_number_of_hdds();
 	DBG_PRINTF("Number of hard disk drives: %u\r\n", SystemInfoBlock.NumberOfHDDs);
@@ -181,7 +181,7 @@ extern void bootldr_main(unsigned char driveIndex) {
 	====================*/
 
 
-	if (drive_read_sectors_ext(0, 1, (void*)&MasterBootRecord) != 1) panic("Error: failed to read MBR!\r\n");
+	if (drive_read_sectors_ext(0, 1, (void*)&MasterBootRecord) != 1) panic("Error: failed to read MBR!");
 
 	size_t numOfBootUnits = 0;
 	BootUnit_t* bootUnits = build_boot_unit_table(NULL, &numOfBootUnits);
@@ -229,16 +229,17 @@ extern void bootldr_main(unsigned char driveIndex) {
 				sizeof(RBFSBootUnit_t) * (SystemInfoBlock.NumberOfBootUnits + 1)
 			);
 
-			if (!SystemInfoBlock.RBFSBootUnits) panic("Error: failed to allocate memory!\r\n");
+			if (!SystemInfoBlock.RBFSBootUnits) panic("Error: failed to allocate memory!");
 
 			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].DriveIndex = bootUnits[i].DriveIndex;
-			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].BootConfigFileHeaderAddress = BootConfigFileHeaderAddress;
+			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionHeaderAddress = PartitionHeaderAddr;
+			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].CfgFileHeaderAddress = BootConfigFileHeaderAddress;
 
 			tmpStrLen = strlen(&PartitionHeader.Name[0]);
 			SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName = (char*)malloc(tmpStrLen + 1);
 			if (
 				!SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName
-			) panic("Error: failed to allocate memory!\r\n");
+			) panic("Error: failed to allocate memory!");
 
 			memcpy(
 				&SystemInfoBlock.RBFSBootUnits[SystemInfoBlock.NumberOfBootUnits].PartitionName[0],
@@ -373,13 +374,171 @@ extern void bootldr_main(unsigned char driveIndex) {
 		}
 	}
 
-	if (SystemInfoBlock.NumberOfBootUnits) {
+	if (!SystemInfoBlock.NumberOfBootUnits) __asm__ __volatile__("cli; hlt");
+
+	tty_set_text_color(TTY_COLOR_LIGHT_GRAY);
+	tty_clear_screen();
+	tty_set_line(0);
+	tty_set_column(0);
+
+	RBFSBootUnit_t* selUnit = &SystemInfoBlock.RBFSBootUnits[selUnitIndex];
+	drive_select(selUnit->DriveIndex);
+	if (
+		drive_read_sectors_ext((uint64_t)selUnit->CfgFileHeaderAddress, 1, &BootConfigFileHeader) != 1
+	) panic("Error: failed to read boot cfg file header!\r\n");
+
+	char* cfgData = (char*)malloc(BootConfigFileHeader.SizeInBytes);
+	if (!cfgData) panic("Error: failed to allocate memory!\r\n");
+
+	if (
+		rbfs_read_file((uint64_t)selUnit->CfgFileHeaderAddress, cfgData) != BootConfigFileHeader.SizeInBytes
+	) panic("Error: failed to read config file!\r\n");
+
+	size_t cfgUnitsCount = 0;
+	ConfigFormatUnit_t* cfgUnits = NULL;
+	fmt_cfg_conv_str_to_units(cfgData, &cfgUnits, &cfgUnitsCount);
+
+	if (!cfgUnits) panic("Error: failed to parse config file!");
+
+	char* cfgKernelPathStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "KERNEL_PATH");
+	char* cfgKernelFormatStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "KERNEL_FORMAT");
+	char* cfgVideoModeTypeStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VIDEO_MODE_TYPE");
+	char* cfgVideoModeWidthStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VIDEO_MODE_WIDTH");
+	char* cfgVideoModeHeightStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VIDEO_MODE_HEIGHT");
+	char* cfgVideoModeBPPStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VIDEO_MODE_BPP");
+
+	if (!cfgKernelPathStr) panic("Error: KERNEL_PATH is not set!");
+	if (!cfgKernelFormatStr) panic("Error: KERNEL_PATH is not set!");
+	if (!cfgVideoModeTypeStr) panic("Error: VIDEO_MODE_TYPE is not set!");
+	if (!cfgVideoModeWidthStr) panic("Error: VIDEO_MODE_WIDTH is not set!");
+	if (!cfgVideoModeHeightStr) panic("Error: VIDEO_MODE_HEIGHT is not set!");
+	if (!cfgVideoModeBPPStr) panic("Error: VIDEO_MODE_BPP is not set!");
+
+	size_t cfgVideoModeWidth = (size_t)uratol(cfgVideoModeWidthStr);
+	size_t cfgVideoModeHeight = (size_t)uratol(cfgVideoModeHeightStr);
+	size_t cfgVideoModeBPP = (size_t)uratol(cfgVideoModeBPPStr);
+
+	DBG_PRINTF("Kernel path: `%s`\r\n", cfgKernelPathStr);
+	DBG_PRINTF("Video mode type: `%s`\r\n", cfgVideoModeTypeStr);
+	DBG_PRINTF("Video mode width: %u\r\n", cfgVideoModeWidth);
+	DBG_PRINTF("Video mode height: %u\r\n", cfgVideoModeHeight);
+	DBG_PRINTF("Video mode bpp: %u\r\n", cfgVideoModeBPP);
+	
+	if (!strcmp(cfgVideoModeTypeStr, "VESA_GRAPHICS")) {
+		char* cfgVesaVideoModeAttributesStr = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VESA_VIDEO_MODE_ATTRIBUTES");
+		char* cfgVesaVideoModeMemoryModels = fmt_cfg_get_value(cfgUnits, cfgUnitsCount, "VESA_VIDEO_MODE_MEMORY_MODELS");
+		if (!cfgVesaVideoModeAttributesStr) panic("Error: VESA_VIDEO_MODE_ATTRIBUTES is not set!");
+		if (!cfgVesaVideoModeMemoryModels) panic("Error: VESA_VIDEO_MODE_MEMORY_MODELS is not set!");
+
+		size_t cfgVesaVideoModeAttributes = (size_t)uratol(cfgVesaVideoModeAttributesStr);
+		DBG_PRINTF("Vesa video mode attributes: %u\r\n", cfgVesaVideoModeAttributes);
+
+		uint16_t* videoModeNumbers = (uint16_t*)SEGOFF_TO_PHYS(
+			SystemInfoBlock.VESAInfo.VideoModeSegment,
+			SystemInfoBlock.VESAInfo.VideoModeOffset
+		);
+
+		VESAModeInfo_t* modeInfo;
+		uint8_t curMemoryModel = 0;
+		uint8_t videoModeFound = false;
+		size_t videoModeNumberIndex = 0;
+		char* ptr = (char*)&cfgVesaVideoModeMemoryModels[0];
+
+		while (*ptr) {
+			while (ispunct(*ptr)) ++ptr;
+
+			videoModeNumberIndex = 0;
+			curMemoryModel = (uint8_t)strtol(ptr, NULL);
+			DBG_PRINTF("Cur mem model: %u\r\n", curMemoryModel);
+
+			while (videoModeNumbers[videoModeNumberIndex] != 0xFFFF) {
+				modeInfo = vesa_get_mode_info(videoModeNumbers[videoModeNumberIndex]);
+
+				if (
+					modeInfo->MemoryModel == curMemoryModel &&
+					modeInfo->Width == cfgVideoModeWidth &&
+					modeInfo->Height == cfgVideoModeHeight &&
+					modeInfo->BitsPerPixel == cfgVideoModeBPP &&
+					(modeInfo->Attributes & cfgVesaVideoModeAttributes) == cfgVesaVideoModeAttributes
+				) {
+					videoModeFound = true;
+					break;
+				}
+
+				++videoModeNumberIndex;
+			}
+
+			++ptr;
+		}
+
+		if (!videoModeFound) panic("Error: couldn't find the required VESA mode!");
+		if (!vesa_set_mode(videoModeNumbers[videoModeNumberIndex])) panic("Error: failed to set VESA video mode!");
+
+		SystemInfoBlock.VideoBufferAddress = (size_t)modeInfo->LFBPointer;
+		SystemInfoBlock.VideoModeWidth = (size_t)modeInfo->Width;
+		SystemInfoBlock.VideoModeHeight = (size_t)modeInfo->Height;
+		SystemInfoBlock.VideoModeBitsPerPixel = (size_t)modeInfo->BitsPerPixel;
+		SystemInfoBlock.VideoModeBytesPerScanLine = (size_t)modeInfo->Pitch;
+	}
+	else if (!strcmp(cfgVideoModeTypeStr, "VGA_TEXT")) {
+		if (
+			cfgVideoModeWidth == 80 && cfgVideoModeHeight == 25 && cfgVideoModeBPP == 8
+		) CALL_RM_SERVICE(RM_SERVICE_SET_BIOS_VIDEO_MODE, ::"c"(0x03));
+		else panic("Error: unknown VGA text mode!");
+
+		SystemInfoBlock.VideoBufferAddress = 0xA0000;
+		SystemInfoBlock.VideoModeWidth = 320;
+		SystemInfoBlock.VideoModeHeight = 200;
+		SystemInfoBlock.VideoModeBitsPerPixel = 8;
+		SystemInfoBlock.VideoModeBytesPerScanLine = 320;
+	}
+	else if (!strcmp(cfgVideoModeTypeStr, "VGA_GRAPHICS")) {
+		if (
+			cfgVideoModeWidth == 320 && cfgVideoModeHeight == 200 && cfgVideoModeBPP == 8
+		) CALL_RM_SERVICE(RM_SERVICE_SET_BIOS_VIDEO_MODE, ::"c"(0x13));
+		else panic("Error: unknown VGA graphics mode!");
+
+		SystemInfoBlock.VideoBufferAddress = 0xB8000;
+		SystemInfoBlock.VideoModeWidth = 80;
+		SystemInfoBlock.VideoModeHeight = 25;
+		SystemInfoBlock.VideoModeBitsPerPixel = 8;
+		SystemInfoBlock.VideoModeBytesPerScanLine = 160;
+	}
+	else panic("Error: unknown video mode!");
+
+	rbfs_hash_t kernelPathHash = rbfs_hash_str(cfgKernelPathStr);
+	size_t kernelHeaderAddress = rbfs_get_file_header(selUnit->PartitionHeaderAddress, kernelPathHash, &BootConfigFileHeader);
+	if (kernelHeaderAddress == (size_t)-1) panic("Error: failed to read kernel file header!");
+
+	uint8_t* kernelData = (uint8_t*)malloc((size_t)BootConfigFileHeader.SizeInBytes);
+	if (!kernelData) panic("Error: failed to allocate memory for kernel data!");
+
+	if (
+		rbfs_read_file(kernelHeaderAddress, kernelData) != BootConfigFileHeader.SizeInBytes
+	) panic("Error: failed to read kernel file!");
+
+	if (!strcmp(cfgKernelFormatStr, "YBT")) {
+		size_t baseAddr = (size_t)((uint32_t*)(kernelData))[0];
+		size_t stackTop = (size_t)((uint32_t*)(kernelData))[2];
+		size_t entryPoint = (size_t)((uint32_t*)(kernelData))[3];
+
+		DBG_PRINTF("Base addr: %#x\r\n", baseAddr);
+		DBG_PRINTF("Stack top addr: %#x\r\n", stackTop);
+		DBG_PRINTF("Entry point addr: %#x\r\n", entryPoint);
+
+		memcpy((void*)baseAddr, kernelData, (size_t)BootConfigFileHeader.SizeInBytes);
+
 		__asm__ __volatile__(
-			"jmp ."
-			::"a"(0x99887766),
-			"b"(selUnitIndex)
+			"movl %%eax, %%ebp;"
+			"movl %%ebp, %%esp;"
+			"pushl %%ebx;"
+			"calll %%ecx"
+			::"a"(stackTop),
+			"b"(&SystemInfoBlock),
+			"c"(entryPoint)
 		);
 	}
+	else panic("Error: unknown kernel format!");
 
 	if (
 		SystemInfoBlock.RBFSBootUnits

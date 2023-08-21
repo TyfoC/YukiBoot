@@ -38,7 +38,6 @@ size_t rbfs_get_file_header(size_t partitionHeaderAddress, rbfs_hash_t filePathH
 
 	size_t fileHdrAddr = (size_t)((int64_t)partitionHeaderAddress + tmp_partition_header_.DataOffset);
 
-
 	for (size_t i = 0; i < (size_t)tmp_partition_header_.NumberOfFileHeaders; i++) {
 		if (drive_read_sectors_ext((uint64_t)fileHdrAddr, 1, fileHeader) != 1) return (long unsigned int)-1;
 
@@ -55,12 +54,11 @@ size_t rbfs_read_file(size_t fileHeaderAddress, void* buffer) {
 
 	size_t resultCnt = 0;
 	size_t dataChunkAddr = fileHeaderAddress + tmp_file_header_.FirstChunkOffset;
-	for (size_t i = 0; i < (size_t)tmp_file_header_.LengthInSectors; i++) {
+	for (; resultCnt < (size_t)tmp_file_header_.SizeInBytes; resultCnt += RBFS_DATA_CHUNK_DATA_SIZE) {
 		if (drive_read_sectors_ext((uint64_t)dataChunkAddr, 1, buffer) != 1) return resultCnt;
 
-		resultCnt += RBFS_DATA_CHUNK_DATA_SIZE;
-		buffer = (void*)((size_t)buffer + RBFS_DATA_CHUNK_DATA_SIZE);
 		dataChunkAddr = (size_t)((int64_t)dataChunkAddr + ((RBFSDataChunk_t*)buffer)->NextOffset);
+		buffer = (void*)((size_t)buffer + RBFS_DATA_CHUNK_DATA_SIZE);
 		if (!dataChunkAddr) break;
 	}
 
